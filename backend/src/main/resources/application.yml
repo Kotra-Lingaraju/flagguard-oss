@@ -1,0 +1,10 @@
+server:
+  port: 8080
+
+flagguard:
+  flagsmith-url: ${FLAGSMITH_URL:http://localhost:8000}
+  client-key: ${FLAGSMITH_CLIENT_KEY:}
+  server-key: ${FLAGSMITH_SERVER_KEY:}
+  org-api-key: ${FLAGSMITH_ORG_API_KEY:}
+  watchdog-interval-ms: 3000
+  min-sample-size: 5

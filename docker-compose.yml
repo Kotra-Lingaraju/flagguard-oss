@@ -1,0 +1,68 @@
+services:
+  postgres:
+    image: postgres:15.5-alpine
+    environment:
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: flagsmith
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d flagsmith -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  flagsmith-migrate-db:
+    image: docker.flagsmith.com/flagsmith/flagsmith:latest
+    environment:
+      DATABASE_URL: postgresql://postgres:password@postgres:5432/flagsmith
+    command: migrate
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  flagsmith:
+    image: docker.flagsmith.com/flagsmith/flagsmith:latest
+    environment:
+      DATABASE_URL: postgresql://postgres:password@postgres:5432/flagsmith
+      USE_POSTGRES_FOR_ANALYTICS: "true"
+      ALLOW_REGISTRATION_WITHOUT_INVITE: "true"
+      DJANGO_ALLOWED_HOSTS: "*"
+      ALLOWED_HOSTS: "*"
+    ports:
+      - "8000:8000"
+    depends_on:
+      flagsmith-migrate-db:
+        condition: service_completed_successfully
+
+  flagsmith-task-processor:
+    image: docker.flagsmith.com/flagsmith/flagsmith:latest
+    environment:
+      DATABASE_URL: postgresql://postgres:password@postgres:5432/flagsmith
+    command: run-task-processor
+    depends_on:
+      flagsmith-migrate-db:
+        condition: service_completed_successfully
+
+  flagguard-backend:
+    build: ./backend
+    env_file:
+      - .env
+    environment:
+      FLAGSMITH_URL: http://flagsmith:8000
+    ports:
+      - "18080:8080"
+    depends_on:
+      - flagsmith
+
+  flagguard-ui:
+    build: ./frontend
+    environment:
+      NEXT_PUBLIC_API_URL: http://127.0.0.1:18080/api
+    ports:
+      - "3000:3000"
+    depends_on:
+      - flagguard-backend
+
+volumes:
+  pgdata:
